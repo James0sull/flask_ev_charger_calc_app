@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic EV Home Charging Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .calculator-card {
+            background: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="calculator-card p-4 p-sm-5">
+                <h2 class="text-center text-success mb-4">⚡ Dynamic EV Charging Calculator</h2>
+                <p class="text-muted text-center mb-5">Adjust the sliders or select presets below to instantly calculate your charge time.</p>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6">
+                        <label for="car-preset" class="form-label fw-bold">Select EV Model (Preset)</label>
+                        <select id="car-preset" class="form-select text-success">
+                            <option value="custom" selected>✏️ Custom (Type below)</option>
+                            <option value="40">Nissan Leaf (40 kWh)</option>
+                            <option value="60">BYD Dolphin (60 kWh)</option>
+                            <option value="78">Tesla Model 3 / Y (78 kWh)</option>
+                            <option value="100">Tesla Model S (100 kWh)</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="charger-preset" class="form-label fw-bold">Select Charger Type (Preset)</label>
+                        <select id="charger-preset" class="form-select text-success">
+                            <option value="custom" selected>✏️ Custom (Type below)</option>
+                            <option value="2.3">Standard Wall Outlet (2.3 kW)</option>
+                            <option value="3.6">Slow Dedicated Charger (3.6 kW)</option>
+                            <option value="7.4">Standard Home Wallbox (7.4 kW)</option>
+                            <option value="22.0">Fast Destination AC (22.0 kW)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6">
+                        <label for="battery-size" class="form-label fw-bold">Battery Capacity (kWh)</label>
+                        <input type="number" id="battery-size" class="form-control" value="60" min="5" max="150" step="1">
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="charger-speed" class="form-label fw-bold">Charger Speed (kW)</label>
+                        <input type="number" id="charger-speed" class="form-control" value="7.4" min="1" max="350" step="0.1">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between">
+                        <label for="start-charge" class="form-label fw-bold">Starting Charge State: <span id="start-val" class="text-success">20%</span></label>
+                    </div>
+                    <input type="range" class="form-range" id="start-charge" min="0" max="95" value="20">
+                </div>
+
+                <div class="mb-5">
+                    <div class="d-flex justify-content-between">
+                        <label for="target-charge" class="form-label fw-bold">Target Charge State: <span id="target-val" class="text-success">80%</span></label>
+                    </div>
+                    <input type="range" class="form-range" id="target-charge" min="5" max="100" value="80">
+                </div>
+
+                <div class="card bg-success text-white text-center p-4">
+                    <h5 class="card-title text-uppercase mb-2">Estimated Charging Time</h5>
+                    <h1 id="result-time" class="display-4 fw-bold">0 hrs</h1>
+                    <p id="math-breakdown" class="mb-0 small opacity-75">Adjust inputs to see the math break down</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    
+    const carPreset = document.getElementById('car-preset');
+    const chargerPreset = document.getElementById('charger-preset');
+    const batterySize = document.getElementById('battery-size');
+    const chargerSpeed = document.getElementById('charger-speed');
+    const startCharge = document.getElementById('start-charge');
+    const targetCharge = document.getElementById('target-charge');
+    
+    const startVal = document.getElementById('start-val');
+    const targetVal = document.getElementById('target-val');
+    const resultTime = document.getElementById('result-time');
+    const mathBreakdown = document.getElementById('math-breakdown');
+
+    carPreset.addEventListener('change', () => {
+        if (carPreset.value !== 'custom') {
+            batterySize.value = carPreset.value;
+        }
+        calculateTime();
+    });
+
+    chargerPreset.addEventListener('change', () => {
+        if (chargerPreset.value !== 'custom') {
+            chargerSpeed.value = chargerPreset.value;
+        }
+        calculateTime();
+    });
+
+    batterySize.addEventListener('input', () => {
+        carPreset.value = 'custom';
+        calculateTime();
+    });
+    chargerSpeed.addEventListener('input', () => {
+        chargerPreset.value = 'custom';
+        calculateTime();
+    });
+
+    startCharge.addEventListener('input', () => {
+        
+        if (parseInt(startCharge.value) >= parseInt(targetCharge.value)) {
+            startCharge.value = parseInt(targetCharge.value) - 5;
+        }
+        startVal.textContent = startCharge.value + '%';
+        calculateTime();
+    });
+
+    targetCharge.addEventListener('input', () => {
+    
+        if (parseInt(targetCharge.value) <= parseInt(startCharge.value)) {
+            targetCharge.value = parseInt(startCharge.value) + 5;
+        }
+        targetVal.textContent = targetCharge.value + '%';
+        calculateTime();
+    });
+
+    function calculateTime() {
+        const capacity = parseFloat(batterySize.value);
+        const speed = parseFloat(chargerSpeed.value);
+        const start = parseInt(startCharge.value);
+        const target = parseInt(targetCharge.value);
+
+        if (isNaN(capacity) || isNaN(speed) || capacity <= 0 || speed <= 0) {
+            resultTime.textContent = "0 hrs";
+            mathBreakdown.textContent = "Please enter valid values.";
+            return;
+        }
+
+        const percentToCharge = target - start;
+        const energyNeeded = capacity * (percentToCharge / 100);
+
+        const rawHours = energyNeeded / speed;
+
+        const hours = Math.floor(rawHours);
+        const minutes = Math.round((rawHours - hours) * 60);
+        
+        let timeString = "";
+        if (hours > 0) {
+            timeString += `${hours} hr${hours > 1 ? 's' : ''} `;
+        }
+        if (minutes > 0 || hours === 0) {
+            timeString += `${minutes} min${minutes > 1 ? 's' : ''}`;
+        }
+
+        resultTime.textContent = timeString;
+        mathBreakdown.textContent = `Math: Adding ${energyNeeded.toFixed(1)} kWh (${percentToCharge}% charge) at a rate of ${speed} kW`;
+    }
+
+    calculateTime();
+</script>
+
+</body>
+</html>
